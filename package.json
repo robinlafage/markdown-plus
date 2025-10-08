@@ -9,13 +9,15 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "markdown-plus.helloWorld",
-        "title": "Hello World"
+        "command": "markdown-plus.updateChecklist",
+        "title": "Mettre à jour la progression de la checklist"
       }
     ]
   },
