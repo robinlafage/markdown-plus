@@ -48,7 +48,7 @@ async function updateAllChecklists(document: vscode.TextDocument) {
         let total = 0;
         for (let j = i + 1; j < lines.length; j++) {
             const taskLine = lines[j].trim();
-            if (taskLine.match(headerRegex) || taskLine == "") break; // nouvelle checklist → stop
+            if (taskLine.match(headerRegex) || taskLine == "") break; // nouvelle checklist : stop
             if (taskLine.startsWith('- [')) {
                 total++;
                 if (taskLine.match(/- \[[xX]\]/)) done++;
