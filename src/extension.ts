@@ -1,26 +1,30 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
+
+let emojiList: { char: string; name: string }[] = [];
 
 /**
  * Fonction appelée à l'activation de l'extension
  */
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Extension "markdown-checklist-progress" activée.');
+    console.log('Extension "markdown-plus" activée.');
 
-    // Commande manuelle (palette)
-    const disposable = vscode.commands.registerCommand('markdown-checklist-progress.update', () => {
-        const editor = vscode.window.activeTextEditor;
-        if (editor && editor.document.languageId === 'markdown') {
-            updateAllChecklists(editor.document);
-        }
-    });
-
-    context.subscriptions.push(disposable);
+    const emojiPath = path.join(context.extensionPath, 'data', 'emojis_list.json');
+    if (fs.existsSync(emojiPath)) {
+        const raw = fs.readFileSync(emojiPath, 'utf8');
+        emojiList = JSON.parse(raw);
+        console.log(`✅ ${emojiList.length} emojis chargés.`);
+    } else {
+        console.warn('⚠️ Fichier emojis.json non trouvé.');
+    }
 
     // Mise à jour automatique dès qu'un document Markdown est modifié
     vscode.workspace.onDidChangeTextDocument((event) => {
         const doc = event.document;
         if (doc.languageId === 'markdown') {
             updateAllChecklists(doc);
+            replaceEmojis(event);
         }
     });
 }
@@ -71,7 +75,47 @@ async function updateAllChecklists(document: vscode.TextDocument) {
     await vscode.workspace.applyEdit(edit);
 }
 
+/*
+    * Remplace les codes emoji (ex: ":grinning_face:") par le caractère emoji correspondant
+*/
+async function replaceEmojis(event: vscode.TextDocumentChangeEvent) {
+    const doc = event.document;
+    const editor = vscode.window.activeTextEditor;
+
+    if (!editor || doc.languageId !== 'markdown') return;
+
+    const changes = event.contentChanges;
+    if (changes.length === 0) return;
+
+    const lastChange = changes[0];
+    const inserted = lastChange.text;
+
+    // On n’agit que si ":" est tapé (potentiel déclencheur de fin de code)
+    if (!inserted.includes(':')) return;
+
+    const line = doc.lineAt(lastChange.range.start.line);
+    const match = line.text.match(/:([a-z0-9_+\-]+):/i);
+    if (!match) return;
+
+    const key = match[1].replace(/_/g, ' '); // ex: "grinning_face" → "grinning face"
+
+    // Recherche de l’emoji par son nom dans la liste
+    const emojiEntry = emojiList.find(e => e.name.toLowerCase() === key.toLowerCase());
+    if (!emojiEntry) return; // emoji non trouvé
+
+    // Remplace le code texte par le caractère emoji
+    const range = new vscode.Range(
+        line.range.start.translate(0, match.index ?? 0),
+        line.range.start.translate(0, (match.index ?? 0) + match[0].length)
+    );
+
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(doc.uri, range, emojiEntry.char);
+    await vscode.workspace.applyEdit(edit);
+}
+
+
 /**
  * Fonction appelée à la désactivation
  */
-export function deactivate() {}
+export function deactivate() { }
