@@ -47,32 +47,67 @@ async function updateAllChecklists(document: vscode.TextDocument) {
         const match = line.match(headerRegex);
         if (!match) continue; // pas un header de checklist
 
-        // On cherche les tâches qui suivent immédiatement
+        // Chercher les tâches qui suivent
         let done = 0;
         let total = 0;
         for (let j = i + 1; j < lines.length; j++) {
             const taskLine = lines[j].trim();
-            if (taskLine.match(headerRegex) || taskLine == "") break; // nouvelle checklist : stop
+            if (taskLine.match(headerRegex) || taskLine === "") break; // nouvelle checklist ou fin
             if (taskLine.startsWith('- [')) {
                 total++;
                 if (taskLine.match(/- \[[xX]\]/)) done++;
             }
         }
 
-        if (total === 0) continue; // pas de tâches → rien à modifier
+        if (total === 0) continue;
 
+        // Construire le nouveau header
         const newHeader = `${match[1]}(${done}/${total})${match[2]}`;
 
-        // Ne rien faire si déjà correct
-        if (line === newHeader) continue;
+        // Si le header a changé, le mettre à jour
+        if (line !== newHeader) {
+            const headerLine = document.lineAt(i);
+            edit.replace(document.uri, headerLine.range, newHeader);
+        }
 
-        // Ajouter la modification
-        const headerLine = document.lineAt(i);
-        edit.replace(document.uri, headerLine.range, newHeader);
+        // Vérifier la présence d’un tag [progress_bar]
+        let progressBarLineIndex = -1;
+        for (let j = i + 1; j < lines.length; j++) {
+            const nextLine = lines[j];
+            if (nextLine.match(headerRegex) || nextLine.trim() === "") break;
+            if (nextLine.includes("[progress_bar]") || nextLine.includes('▰') || nextLine.includes('▱')) {
+                progressBarLineIndex = j;
+                break;
+            }
+        }
+
+        // Si pas de tag [progress_bar], on ne fait rien
+        if (progressBarLineIndex === -1) {
+            continue;
+        }
+
+        // Générer la nouvelle barre de progression
+        const progressBar = generateProgressBar(done, total);
+
+        // Remplacer uniquement le contenu du tag
+        const progressBarLine = document.lineAt(progressBarLineIndex);
+
+        // Mettre à jour uniquement si différent
+        if (progressBar !== progressBarLine.text) {
+            edit.replace(document.uri, progressBarLine.range, progressBar);
+        }
     }
 
-    // Appliquer toutes les modifications d'un coup
+    // Appliquer toutes les modifications d’un coup
     await vscode.workspace.applyEdit(edit);
+}
+
+
+function generateProgressBar(done: number, total: number, size = 10): string {
+    const ratio = done / total;
+    const filled = Math.round(size * ratio);
+    const empty = size - filled;
+    return '▰'.repeat(filled) + '▱'.repeat(empty) + ` ${Math.round(ratio * 100)}%`;
 }
 
 /*
